@@ -53,8 +53,33 @@ def main():
         st.info("Aucune transaction trouvée. Veuillez en importer via la barre latérale.")
         return
 
-    # --- Account Filtering ---
-    filter_account = st.radio("Filtrer par compte", ["Tous", "Perso", "Commun"], horizontal=True)
+    st.subheader("Filtres et Affichage")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        filter_account = st.radio(
+            "Filtrer par compte",
+            ["Tous", "Perso", "Commun"],
+            horizontal=True,
+            key="account_filter",
+        )
+    
+    # --- Column Selector ---
+    all_columns = transactions_df.columns.tolist()
+    if 'hash' in all_columns:
+        all_columns.remove('hash') # Hide hash from selection
+
+    if 'selected_columns' not in st.session_state:
+        st.session_state.selected_columns = ['date_op', 'libelle_simple', 'montant', 'categorie', 'sous_categorie', 'type_budget']
+
+    with st.expander("Gérer les colonnes visibles"):
+         st.session_state.selected_columns = st.multiselect(
+            "Choisir les colonnes à afficher",
+            all_columns,
+            default=st.session_state.selected_columns,
+        )
+
+    # --- Data Filtering ---
     if filter_account != "Tous":
         display_df = transactions_df[transactions_df["account_type"] == filter_account].copy()
     else:
@@ -69,20 +94,31 @@ def main():
         st.progress(1 - (percent_uncategorized / 100))
 
     # --- AgGrid Table Display ---
-    st.subheader("Transactions (avec tri et filtres intégrés)")
+    st.subheader("Transactions")
     if display_df.empty:
         st.warning("Aucune transaction à afficher avec les filtres actuels.")
         return
 
-    gb = GridOptionsBuilder.from_dataframe(display_df)
+    # Ensure selected columns exist in the dataframe before displaying
+    cols_to_display = [col for col in st.session_state.selected_columns if col in display_df.columns]
+    grid_df = display_df[['hash'] + cols_to_display] # Keep hash for updates
+
+    gb = GridOptionsBuilder.from_dataframe(grid_df)
     gb.configure_column("categorie", editable=True)
     gb.configure_column("sous_categorie", editable=True)
+    gb.configure_column(
+        "type_budget", 
+        editable=True,
+        cellEditor='agSelectCellEditor',
+        cellEditorParams={'values': ['Ponctuel', 'Récurrente']}
+    )
+
     gb.configure_column("hash", hide=True)
     gb.configure_default_column(resizable=True, sortable=True, filter=True)
     grid_options = gb.build()
 
     grid_response = AgGrid(
-        display_df,
+        grid_df,
         gridOptions=grid_options,
         data_return_mode=DataReturnMode.AS_INPUT,
         update_mode=GridUpdateMode.MODEL_CHANGED,
@@ -93,13 +129,14 @@ def main():
     )
 
     edited_df = grid_response['data']
-    original_dict = display_df.set_index('hash').to_dict('index')
+    original_dict = grid_df.set_index('hash').to_dict('index')
     edited_dict = edited_df.set_index('hash').to_dict('index')
 
+    # --- Save Changes Logic ---
     changes_detected = any(
-        original_dict.get(hash_id, {}).get('categorie') != edited_row.get('categorie') or
-        original_dict.get(hash_id, {}).get('sous_categorie') != edited_row.get('sous_categorie')
+        original_dict.get(hash_id, {}).get(col) != edited_row.get(col)
         for hash_id, edited_row in edited_dict.items()
+        for col in ['categorie', 'sous_categorie', 'type_budget']
     )
 
     if changes_detected:
@@ -107,8 +144,15 @@ def main():
             with st.spinner("Sauvegarde en cours..."):
                 for hash_id, edited_row in edited_dict.items():
                     original_row = original_dict.get(hash_id, {})
-                    if original_row and (original_row.get('categorie') != edited_row.get('categorie') or original_row.get('sous_categorie') != edited_row.get('sous_categorie')):
-                        repo.update_category(hash_id, edited_row.get('categorie'), edited_row.get('sous_categorie'))
+                    if original_row:
+                        # Check and update category
+                        if original_row.get('categorie') != edited_row.get('categorie') or original_row.get('sous_categorie') != edited_row.get('sous_categorie'):
+                            repo.update_category(hash_id, edited_row.get('categorie'), edited_row.get('sous_categorie'))
+                        
+                        # Check and update budget type
+                        if original_row.get('type_budget') != edited_row.get('type_budget'):
+                            repo.update_budget_type(hash_id, edited_row.get('type_budget'))
+            
             st.success("Modifications sauvegardées !")
             st.session_state.transactions = repo.get_all()
             st.rerun()

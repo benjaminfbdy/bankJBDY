@@ -134,3 +134,19 @@ class TransactionRepository:
                 (category, sub_category, transaction_hash)
             )
             conn.commit()
+
+    def update_budget_type(self, transaction_hash: str, budget_type: str):
+        """
+        Updates the budget type of a specific transaction.
+
+        Args:
+            transaction_hash (str): The hash of the transaction to update.
+            budget_type (str): The new budget type ('Ponctuel' or 'Récurrente').
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE transactions SET type_budget = ? WHERE hash = ?",
+                (budget_type, transaction_hash)
+            )
+            conn.commit()
