@@ -1,0 +1,18 @@
+# Database
+finances.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Python specific
+__pycache__/
+*.pyc
+
+# Local files
+/utils/
+.DS_Store
+
+# Environment
+.venv/
+venv/
+env/
