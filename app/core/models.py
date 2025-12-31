@@ -33,3 +33,17 @@ class Goal:
     name: str
     target_amount: float
     current_amount: float
+
+@dataclass
+class Asset:
+    """Represents an asset (e.g., real estate, savings account)."""
+    id: int
+    name: str
+    value: float
+
+@dataclass
+class Liability:
+    """Represents a liability (e.g., a loan, credit card debt)."""
+    id: int
+    name: str
+    value: float

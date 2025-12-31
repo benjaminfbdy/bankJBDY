@@ -8,6 +8,7 @@ from app.repository.transaction_repository import TransactionRepository
 from app.repository.category_repository import CategoryRepository
 from app.repository.budget_repository import BudgetRepository
 from app.repository.goal_repository import GoalRepository
+from app.repository.net_worth_repository import NetWorthRepository
 
 def ensure_data_loaded() -> pd.DataFrame:
     """
@@ -28,9 +29,14 @@ def ensure_data_loaded() -> pd.DataFrame:
         st.session_state.goal_repo = GoalRepository(db_path=DB_NAME)
         st.session_state.goal_repo.create_table()
 
+    if 'net_worth_repo' not in st.session_state:
+        st.session_state.net_worth_repo = NetWorthRepository(db_path=DB_NAME)
+        st.session_state.net_worth_repo.create_tables()
+
     if 'repo' not in st.session_state:
         st.session_state.repo = TransactionRepository(db_path=DB_NAME)
         st.session_state.repo.create_table()
+
 
 
     if 'transactions' not in st.session_state:
