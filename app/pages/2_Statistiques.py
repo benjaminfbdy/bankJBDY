@@ -65,22 +65,31 @@ else:
     # --- Visualizations ---
     st.header("Visualisations")
 
-    # Expenses by Category (Donut Chart)
     expenses_df = filtered_df[filtered_df['montant'] < 0].copy()
-    expenses_df['depenses'] = abs(expenses_df['montant'])
-    category_expenses = expenses_df.groupby('categorie')['depenses'].sum().reset_index()
+    expenses_df['depenses'] = expenses_df['montant'].abs()
 
-    fig_donut = px.pie(
-        category_expenses,
-        names='categorie',
-        values='depenses',
-        title="Répartition des Dépenses par Catégorie",
-        hole=0.4
-    )
-    fig_donut.update_traces(textposition='inside', textinfo='percent+label')
-    st.plotly_chart(fig_donut, use_container_width=True)
+    # Sunburst Chart for hierarchical data
+    st.subheader("Répartition des Dépenses")
+    
+    # Data prep for sunburst
+    sunburst_df = expenses_df.groupby(['categorie', 'sous_categorie']).sum(numeric_only=True).reset_index()
+
+    if not sunburst_df.empty:
+        fig_sunburst = px.sunburst(
+            sunburst_df,
+            path=['categorie', 'sous_categorie'],
+            values='depenses',
+            title="Cliquez sur une catégorie pour explorer les sous-catégories",
+            maxdepth=2
+        )
+        fig_sunburst.update_traces(textinfo='label+percent parent')
+        st.plotly_chart(fig_sunburst, use_container_width=True)
+    else:
+        st.info("Aucune dépense à visualiser pour la période sélectionnée.")
+
 
     # Income vs Expenses over time
+    st.subheader("Évolution Temporelle")
     monthly_summary = filtered_df.set_index('date_op').resample('M').agg(
         revenus=('montant', lambda x: x[x > 0].sum()),
         depenses=('montant', lambda x: abs(x[x < 0].sum()))
@@ -96,21 +105,3 @@ else:
         labels={'value': 'Montant (€)', 'date_op': 'Mois'}
     )
     st.plotly_chart(fig_monthly, use_container_width=True)
-
-    # Detailed Sub-category view
-    with st.expander("🔍 Analyser les sous-catégories"):
-        all_categories = expenses_df['categorie'].dropna().unique().tolist()
-        selected_cat = st.selectbox("Choisissez une catégorie", all_categories)
-
-        if selected_cat:
-            sub_cat_df = expenses_df[expenses_df['categorie'] == selected_cat]
-            sub_cat_summary = sub_cat_df.groupby('sous_categorie')['depenses'].sum().reset_index().sort_values('depenses', ascending=False)
-            
-            fig_sub_cat = px.bar(
-                sub_cat_summary,
-                x='depenses',
-                y='sous_categorie',
-                orientation='h',
-                title=f"Détail des dépenses pour la catégorie : {selected_cat}"
-            )
-            st.plotly_chart(fig_sub_cat, use_container_width=True)

@@ -2,8 +2,6 @@
 
 DB_NAME = "finances.db"
 
-UNCATEGORIZED_KEYWORDS = ["A categoriser", "Transaction exclue", "divers"]
-
 CATEGORIZATION_RULES = {
     'Salaire': ['VIREMENT SALAIRE', 'SALAIRE'],
     'Loyer': ['LOYER'],

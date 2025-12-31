@@ -1,21 +1,24 @@
 # app/services/finance_service.py
 import hashlib
 import pandas as pd
-from typing import List
+from typing import List, Tuple
+from dataclasses import asdict
 
-from app.core.config import CATEGORIZATION_RULES, UNCATEGORIZED_KEYWORDS
 from app.core.models import Transaction
+from app.repository.category_repository import CategoryRepository
 
 class FinanceService:
     """
     Handles all business logic for financial data processing.
     """
+    def __init__(self, category_repo: CategoryRepository):
+        self.category_repo = category_repo
 
     def _calculate_hash(self, row: pd.Series, account_type: str) -> str:
         """Calculates a SHA-256 hash for a transaction row to prevent duplicates."""
         base_string = (
-            str(row.get('Date operation', '')),
-            str(row.get('Libelle operation', '')),
+            str(row.get('date_operation', '')),
+            str(row.get('libelle_operation', '')),
             str(row.get('montant', '')),
             str(account_type)
         )
@@ -50,23 +53,34 @@ class FinanceService:
 
         return df_processed
 
-    def _categorize_transactions(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Automatically categorizes transactions based on keywords."""
+    def _categorize_transactions(self, df: pd.DataFrame, force: bool = False) -> pd.DataFrame:
+        """
+        Automatically categorizes transactions based on dynamic rules from the database.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to categorize.
+            force (bool): If True, re-categorize all transactions, overwriting existing categories.
+                          If False, only categorize transactions with an empty category.
+        """
+        rules = self.category_repo.get_rules()
+        
         if 'categorie' not in df.columns:
             df['categorie'] = ''
-        
-        # Fill NaN to work with string operations
         df['categorie'] = df['categorie'].fillna('')
 
-        # Identify rows that need categorization
-        uncategorized_mask = (df['categorie'] == '') | \
-                             (df['categorie'].str.contains('|'.join(UNCATEGORIZED_KEYWORDS), case=False, na=False))
+        # Determine which rows to apply categorization to.
+        if force:
+            # On force mode, all rows are candidates.
+            categorization_mask = pd.Series(True, index=df.index)
+        else:
+            # By default, only apply rules where category is not already set.
+            categorization_mask = (df['categorie'] == '')
 
-        for category, keywords in CATEGORIZATION_RULES.items():
+        for category, keywords in rules.items():
             for keyword in keywords:
-                # Apply rules only to rows that are marked as uncategorized
                 keyword_mask = df['libelle_operation'].str.contains(keyword, case=False, na=False)
-                df.loc[uncategorized_mask & keyword_mask, 'categorie'] = category
+                # Apply rules only to rows that are marked as candidates
+                df.loc[categorization_mask & keyword_mask, 'categorie'] = category
         return df
 
     def _detect_recurrences(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -95,6 +109,39 @@ class FinanceService:
             if is_monthly:
                 df.loc[group.index, 'type_budget'] = 'Récurrente'
         return df
+
+    def recategorize_all(self, all_transactions: List[Transaction]) -> List[Tuple[str, str]]:
+        """
+        Compares all transactions against the current rules and finds which ones need updating.
+        
+        Args:
+            all_transactions (List[Transaction]): The full list of transactions to process.
+
+        Returns:
+            List[Tuple[str, str]]: A list of tuples, where each is (hash, new_category)
+                                    for transactions whose category should change.
+        """
+        if not all_transactions:
+            return []
+
+        df = pd.DataFrame([asdict(t) for t in all_transactions])
+        # The service layer uses standardized names internally
+        df.rename(columns={'libelle_op': 'libelle_operation'}, inplace=True)
+
+        old_categories = df.set_index('hash')['categorie']
+
+        # This method returns a dataframe with a 'categorie' column
+        df = self._categorize_transactions(df, force=True)
+        new_categories = df.set_index('hash')['categorie']
+
+        # Compare the two series to find differences
+        changed = new_categories[new_categories != old_categories]
+
+        if changed.empty:
+            return []
+        
+        # Return a list of (hash, new_category) tuples
+        return list(changed.to_dict().items())
 
     def process_transactions_from_df(self, df: pd.DataFrame, account_type: str) -> List[Transaction]:
         """

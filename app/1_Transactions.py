@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 from dataclasses import asdict
 
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode, JsCode
 
 from app.services.finance_service import FinanceService
 from app.ui.utils import ensure_data_loaded
@@ -17,7 +17,8 @@ def main():
     # --- Initialization and Data Loading ---
     ensure_data_loaded()
     repo = st.session_state.repo
-    service = FinanceService()
+    category_repo = st.session_state.category_repo
+    service = FinanceService(category_repo=category_repo)
 
     # --- Sidebar for Uploads ---
     st.sidebar.header("📥 Importation de Données")
@@ -101,11 +102,49 @@ def main():
 
     # Ensure selected columns exist in the dataframe before displaying
     cols_to_display = [col for col in st.session_state.selected_columns if col in display_df.columns]
-    grid_df = display_df[['hash'] + cols_to_display] # Keep hash for updates
+    grid_df = display_df[['hash'] + cols_to_display]
 
     gb = GridOptionsBuilder.from_dataframe(grid_df)
-    gb.configure_column("categorie", editable=True)
-    gb.configure_column("sous_categorie", editable=True)
+    
+    # --- Dependent Dropdown Logic ---
+    all_categories = category_repo.get_all_categories()
+    sub_category_map = category_repo.get_all_sub_categories_as_map()
+
+    cell_editor_selector_js = JsCode(f"""
+        function(params) {{
+            const category = params.data.categorie;
+            const subCategoryMap = {sub_category_map};
+            
+            // Check if category exists and has a non-empty list of sub-categories
+            if (category && subCategoryMap[category] && subCategoryMap[category].length > 0) {{
+                return {{
+                    component: 'agSelectCellEditor',
+                    params: {{ values: subCategoryMap[category] }},
+                    popup: true
+                }};
+            }} else {{
+                // If no sub-categories, allow free text entry.
+                return {{
+                    component: 'agTextCellEditor',
+                    popup: true
+                }};
+            }}
+        }}
+    """)
+    
+    gb.configure_column(
+        "categorie", 
+        editable=True,
+        cellEditor='agSelectCellEditor',
+        cellEditorParams={'values': all_categories}
+    )
+    
+    gb.configure_column(
+        "sous_categorie", 
+        editable=True,
+        cellEditorSelector=cell_editor_selector_js
+    )
+
     gb.configure_column(
         "type_budget", 
         editable=True,
@@ -125,7 +164,8 @@ def main():
         fit_columns_on_grid_load=False,
         height=500,
         width='100%',
-        key='transactions_grid'
+        key='transactions_grid',
+        allow_unsafe_jscode=True
     )
 
     edited_df = grid_response['data']
@@ -145,7 +185,7 @@ def main():
                 for hash_id, edited_row in edited_dict.items():
                     original_row = original_dict.get(hash_id, {})
                     if original_row:
-                        # Check and update category
+                        # Check and update category/sub-category
                         if original_row.get('categorie') != edited_row.get('categorie') or original_row.get('sous_categorie') != edited_row.get('sous_categorie'):
                             repo.update_category(hash_id, edited_row.get('categorie'), edited_row.get('sous_categorie'))
                         
@@ -154,7 +194,8 @@ def main():
                             repo.update_budget_type(hash_id, edited_row.get('type_budget'))
             
             st.success("Modifications sauvegardées !")
-            st.session_state.transactions = repo.get_all()
+            # Force a full reload of data from DB
+            del st.session_state.transactions
             st.rerun()
 
 if __name__ == "__main__":
