@@ -94,6 +94,13 @@ class CategoryRepository:
             cursor.execute("SELECT name FROM categories ORDER BY name ASC")
             return [row['name'] for row in cursor.fetchall()]
 
+    def get_category_id_map(self) -> Dict[str, int]:
+        """Returns a dictionary mapping category names to their IDs."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name FROM categories")
+            return {row['name']: row['id'] for row in cursor.fetchall()}
+
     def get_all_sub_categories_as_map(self) -> Dict[str, List[str]]:
         """
         Returns a dictionary mapping parent categories to a list of their sub-categories.
