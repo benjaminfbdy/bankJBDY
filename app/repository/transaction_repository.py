@@ -1,5 +1,6 @@
 # app/repository/transaction_repository.py
 import sqlite3
+import pandas as pd
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import date, datetime
@@ -84,6 +85,8 @@ class TransactionRepository:
             for key, value in record.items():
                 if isinstance(value, (date, datetime)):
                     record[key] = value.isoformat() if value else None
+                elif pd.isna(value): # Explicitly handle NaT from pandas
+                    record[key] = None
             records_to_insert.append(record)
 
         insert_query = """
@@ -115,8 +118,20 @@ class TransactionRepository:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM transactions")
             rows = cursor.fetchall()
-            # Convert rows back to Transaction objects
-            return [Transaction(**row) for row in rows]
+            
+            transactions = []
+            for row in rows:
+                row_dict = dict(row)
+                # Convert date strings from DB back to date objects
+                for date_key in ['date_op', 'date_compte', 'date_valeur']:
+                    if row_dict.get(date_key):
+                        try:
+                            # Handle both 'YYYY-MM-DD' and 'YYYY-MM-DD HH:MM:SS'
+                            row_dict[date_key] = date.fromisoformat(row_dict[date_key].split(' ')[0])
+                        except (ValueError, TypeError):
+                            row_dict[date_key] = None # Or handle error appropriately
+                transactions.append(Transaction(**row_dict))
+            return transactions
 
     def update_category(self, transaction_hash: str, category: str, sub_category: str):
         """
