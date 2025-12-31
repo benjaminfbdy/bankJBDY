@@ -25,3 +25,11 @@ class Transaction:
     date_valeur: Optional[date] = None
     pointage_op: Optional[int] = 0
     type_budget: str = field(default='Ponctuel')
+
+@dataclass
+class Goal:
+    """Represents a financial savings goal."""
+    id: int
+    name: str
+    target_amount: float
+    current_amount: float

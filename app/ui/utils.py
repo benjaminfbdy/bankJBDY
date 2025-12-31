@@ -7,12 +7,14 @@ from app.core.config import DB_NAME, CATEGORIZATION_RULES
 from app.repository.transaction_repository import TransactionRepository
 from app.repository.category_repository import CategoryRepository
 from app.repository.budget_repository import BudgetRepository
+from app.repository.goal_repository import GoalRepository
 
 def ensure_data_loaded() -> pd.DataFrame:
     """
     Initializes repositories and loads transaction data into session state.
     Returns a DataFrame representation of the transactions.
     """
+    # Order is important: create category tables before seeding
     if 'category_repo' not in st.session_state:
         st.session_state.category_repo = CategoryRepository(db_path=DB_NAME)
         st.session_state.category_repo.create_tables()
@@ -22,9 +24,14 @@ def ensure_data_loaded() -> pd.DataFrame:
         st.session_state.budget_repo = BudgetRepository(db_path=DB_NAME)
         st.session_state.budget_repo.create_table()
 
+    if 'goal_repo' not in st.session_state:
+        st.session_state.goal_repo = GoalRepository(db_path=DB_NAME)
+        st.session_state.goal_repo.create_table()
+
     if 'repo' not in st.session_state:
         st.session_state.repo = TransactionRepository(db_path=DB_NAME)
         st.session_state.repo.create_table()
+
 
     if 'transactions' not in st.session_state:
         st.session_state.transactions = st.session_state.repo.get_all()
