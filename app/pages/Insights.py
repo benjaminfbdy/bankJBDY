@@ -7,7 +7,11 @@ from app.ui.utils import ensure_data_loaded
 from app.services.insights_service import InsightsService
 from app.ui.transaction_grid import display_transaction_grid
 
-st.set_page_config(layout="wide", page_title="Insights Financiers")
+st.set_page_config(
+    page_title="Insights Financiers",
+    page_icon="💡",
+    layout="wide"
+)
 
 st.title("💡 Insights & Analyses Automatiques")
 

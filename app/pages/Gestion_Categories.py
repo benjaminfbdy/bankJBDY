@@ -2,7 +2,11 @@
 import streamlit as st
 from app.ui.utils import ensure_data_loaded
 
-st.set_page_config(layout="wide", page_title="Gestion des Catégories")
+st.set_page_config(
+    page_title="Gestion des Catégories",
+    page_icon="⚙️",
+    layout="wide"
+)
 
 st.title("⚙️ Gestion des Catégories et des Règles")
 

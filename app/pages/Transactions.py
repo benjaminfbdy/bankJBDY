@@ -8,7 +8,11 @@ from app.services.finance_service import FinanceService
 from app.ui.utils import ensure_data_loaded
 from app.ui.transaction_grid import display_transaction_grid
 
-st.set_page_config(layout="wide", page_title="Gestion Financière")
+st.set_page_config(
+    page_title="Transactions",
+    page_icon="💰",
+    layout="wide"
+)
 
 def main():
     """Main function to run the Streamlit app."""

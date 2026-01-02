@@ -7,7 +7,11 @@ from datetime import date
 
 from app.ui.utils import ensure_data_loaded
 
-st.set_page_config(layout="wide", page_title="Statistiques Financières")
+st.set_page_config(
+    page_title="Statistiques",
+    page_icon="📊",
+    layout="wide"
+)
 
 st.title("📊 Statistiques et Analyses")
 
@@ -17,8 +21,8 @@ if transactions_df.empty:
     st.warning("Aucune transaction à analyser. Veuillez d'abord importer un fichier depuis la page d'accueil.")
     st.stop()
 
-# --- Convert date columns ---
-transactions_df['date_op'] = pd.to_datetime(transactions_df['date_op'])
+# The 'date_op' column is already a date/datetime object from the repository
+# No need to convert it again.
 
 # --- Filtering ---
 st.header("Filtres")
@@ -45,8 +49,16 @@ if account != "Tous":
 else:
     filtered_df = transactions_df.copy()
 
-filtered_df = filtered_df[(filtered_df['date_op'].dt.date >= start_date) & (filtered_df['date_op'].dt.date <= end_date)]
+# Ensure date columns are proper datetime objects for comparison
+filtered_df['date_op'] = pd.to_datetime(filtered_df['date_op'])
+start_date_ts = pd.to_datetime(start_date)
+end_date_ts = pd.to_datetime(end_date)
 
+# Normalize to midnight for a clean date-only comparison
+filtered_df = filtered_df[
+    (filtered_df['date_op'].dt.normalize() >= start_date_ts) & 
+    (filtered_df['date_op'].dt.normalize() <= end_date_ts)
+]
 # --- Main Metrics ---
 st.header("Vue d'ensemble de la période")
 

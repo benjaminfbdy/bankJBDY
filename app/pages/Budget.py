@@ -5,7 +5,11 @@ from datetime import datetime
 
 from app.ui.utils import ensure_data_loaded
 
-st.set_page_config(layout="wide", page_title="Gestion du Budget")
+st.set_page_config(
+    page_title="Gestion du Budget",
+    page_icon="💰",
+    layout="wide"
+)
 
 st.title("💰 Gestion du Budget Mensuel")
 

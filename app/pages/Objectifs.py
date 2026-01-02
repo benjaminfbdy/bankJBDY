@@ -2,7 +2,11 @@
 import streamlit as st
 from app.ui.utils import ensure_data_loaded
 
-st.set_page_config(layout="wide", page_title="Objectifs d'Épargne")
+st.set_page_config(
+    page_title="Objectifs d'Épargne",
+    page_icon="🎯",
+    layout="wide"
+)
 
 st.title("🎯 Objectifs d'Épargne")
 

@@ -6,7 +6,11 @@ from dataclasses import asdict
 
 from app.ui.utils import ensure_data_loaded
 
-st.set_page_config(layout="wide", page_title="Patrimoine Net")
+st.set_page_config(
+    page_title="Patrimoine Net",
+    page_icon="🏛️",
+    layout="wide"
+)
 
 st.title("🏛️ Suivi du Patrimoine Net")
 
